@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link
+      rel="icon"
+      type="image/x-icon"
+      href="https://envidat.ch/favicon.ico"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EnviDat Geo</title>
+    <style>
+      @import "node_modules/ol/ol.css";
+      @import "node_modules/bootstrap/dist/css/bootstrap.min.css";
+    </style>
+    <style>
+      html,
+      body,
+      #map-container {
+        margin: 0;
+        height: 100%;
+        width: 100%;
+        font-family: sans-serif;
+      }
+      .cycle-layers {
+        top: 65px;
+        left: .5em;
+      }
+      .zoom-level-display {
+        bottom: 65px;
+        left: .5em;
+      }
+      .ol-touch .cycle-layers {
+        top: 80px;
+      }
+      #cog-input {
+        width: 100px;
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        background-color: rgba(255, 50, 50, 0.5);
+        z-index: 1000
+      }
+      table.controls td {
+        padding: 2px 5px;
+      }
+      table.controls td:nth-child(3) {
+        text-align: right;
+        min-width: 3em;
+      }
+    </style>
+  </head>
+  <body>
+
+    <div id="map-container"></div>
+    <script type="module" src="./main.js"></script>
+
+    <div class="container fixed-bottom m-4">
+      <div class="row p-1">
+        <div class="col-sm">
+          <input id="cogUrl" type="url" class="form-control" placeholder="Enter COG URL">
+        </div>
+        <div class="col">
+          <button id="cogSubmit" type="submit" class="btn btn-primary">Submit</button>
+        </div>
+      </div> 
+    </div>
+
+    <div class="container fixed-bottom m-4">
+      <div class="row p-1 justify-content-end">
+        <div class="col-sm-auto">
+          <table class="controls">
+            <tr>
+              <td><label for="vert">vertical exaggeration:</label></td>
+              <td><input id="vert" type="range" min="1" max="5" value="1"/></td>
+              <td><span id="vertOut"></span> x</td>
+            </tr>
+            <tr>
+              <td><label for="sunEl">sun elevation:</label></td>
+              <td><input id="sunEl" type="range" min="0" max="90" value="45"/></td>
+              <td><span id="sunElOut"></span> °</td>
+            </tr>
+            <tr>
+              <td><label for="sunAz">sun azimuth:</label></td>
+              <td><input id="sunAz" type="range" min="0" max="360" value="45"/></td>
+              <td><span id="sunAzOut"></span> °</td>
+            </tr>
+          </table>
+        </div>
+      </div> 
+    </div>
+
+  </body>
+</html>
