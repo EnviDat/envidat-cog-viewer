@@ -3,21 +3,29 @@ import Map from "ol/Map";
 import View from "ol/View";
 import proj4 from "proj4";
 import { register } from "ol/proj/proj4";
-import { transformExtent } from "ol/proj";
+import { transformExtent, transform as transformCoord } from "ol/proj";
 import {
   extend as extendExtent,
   buffer as bufferExtent,
   getCenter,
   getBottomLeft,
   getTopRight,
-  boundingExtent
+  boundingExtent,
 } from "ol/extent";
 
 import XYZ from "ol/source/XYZ";
-import TileWMS from 'ol/source/TileWMS';
+import TileWMS from "ol/source/TileWMS";
 import GeoTIFF from "ol/source/GeoTIFF";
 import TileLayer from "ol/layer/Tile";
 import WebGLTileLayer from "ol/layer/WebGLTile";
+
+import { fromExtent } from "ol/geom/Polygon";
+import Feature from "ol/Feature";
+import VectorLayer from "ol/layer/Vector";
+import VectorSource from "ol/source/Vector";
+
+import { Fill, Stroke, Style } from "ol/style";
+
 import { Control, FullScreen, defaults as defaultControls } from "ol/control";
 
 function configBaseMap(mapFallback, cogView) {
@@ -28,14 +36,14 @@ function configBaseMap(mapFallback, cogView) {
 
     if (["4326", "3857"].includes(epsg)) {
       // EPSG already registered in OpenLayers
-  
+
       if (mapFallback === "OSM") {
         url = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
       } else if (mapFallback === "Satellite") {
         url =
           "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
       } else if (mapFallback === "DEM") {
-        url = "https://{a-d}.tiles.mapbox.com/v3/aj.sf-dem/{z}/{x}/{y}.png"
+        url = "https://{a-d}.tiles.mapbox.com/v3/aj.sf-dem/{z}/{x}/{y}.png";
       }
     } else {
       if (epsg === "2056") {
@@ -48,31 +56,31 @@ function configBaseMap(mapFallback, cogView) {
 
     return new TileLayer({
       source: new XYZ({
-        url: url
+        url: url,
       }),
       minZoom: 1,
-      maxZoom: 19
+      maxZoom: 19,
     });
-
   } else {
-
-    // return new TileWMS({
-    //   url: 'https://s2maps-tiles.eu/wms',
-    //   params: { LAYERS: 's2cloudless-2020' },
-    //   projection: 'EPSG:4326',
-    //   attributions: [
-    //     '<a xmlns: dct="http://purl.org/dc/terms/" href="https://s2maps.eu" property="dct:title">Sentinel-2 cloudless - https://s2maps.eu</a> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://eox.at" property="cc:attributionName" rel="cc:attributionURL">EOX IT Services GmbH</a> (Contains modified Copernicus Sentinel data 2020)',
-    //   ],
-    // })
-
     return new TileLayer({
-      source: new XYZ({
-        url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+      extent: [-180, -90, 180, 90],
+      source: new TileWMS({
+        url: "https://s2maps-tiles.eu/wms",
+        params: { LAYERS: "s2cloudless-2020" },
+        projection: "EPSG:4326",
+        attributions: [
+          '<a xmlns: dct="http://purl.org/dc/terms/" href="https://s2maps.eu" property="dct:title">Sentinel-2 cloudless - https://s2maps.eu</a> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://eox.at" property="cc:attributionName" rel="cc:attributionURL">EOX IT Services GmbH</a> (Contains modified Copernicus Sentinel data 2020)',
+        ],
       }),
-      minZoom: 1,
-      maxZoom: 19
     });
 
+    // return new TileLayer({
+    //   source: new XYZ({
+    //     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+    //   }),
+    //   minZoom: 1,
+    //   maxZoom: 19
+    // });
   }
 }
 
@@ -94,8 +102,8 @@ function validUrl(str) {
 function encodeUrlFilename(str) {
   const url = new URL(str);
   const pathname = url.pathname;
-  const index = pathname.lastIndexOf('/');
-  let encodedPath = '';
+  const index = pathname.lastIndexOf("/");
+  let encodedPath = "";
 
   if (index !== -1) {
     const filename = encodeURIComponent(pathname.substring(index + 1));
@@ -110,7 +118,7 @@ function encodeUrlFilename(str) {
   return cogUrl;
 }
 
-const getCOGDetails = view => {
+const getCOGDetails = (view) => {
   return [view.projection.code_.split(":")[1], view.center, view.extent];
 };
 
@@ -129,12 +137,32 @@ async function getProj4String(epsg) {
   return response.text();
 }
 
+function createPolygonFromExtent(extent, cogUrl, cogCenter) {
+  const polygon = fromExtent(extent);
 
+  const polygonFeature = new Feature({
+    geometry: polygon,
+    cogUrl: cogUrl,
+    cogCenter: cogCenter,
+  });
 
+  const polygonSource = new VectorSource({
+    features: [polygonFeature],
+  });
 
-
-
-
+  return new VectorLayer({
+    source: polygonSource,
+    style: new Style({
+      stroke: new Stroke({
+        color: "blue",
+        width: 3,
+      }),
+      fill: new Fill({
+        color: "rgba(0, 0, 255, 0.1)",
+      }),
+    }),
+  });
+}
 
 // const variables = {};
 
@@ -188,25 +216,14 @@ async function getProj4String(epsg) {
 //   control.addEventListener('change', listener);
 // });
 
-
-
-
-
-
-
-
-
-
-
 function configCOGLayer(url) {
-
   const cogSource = new GeoTIFF({
     sources: [
       {
         url: url,
         // nodata: -9999,
-      }
-    ]
+      },
+    ],
   });
 
   const cogLayer = new WebGLTileLayer({
@@ -243,25 +260,27 @@ function configCOGLayer(url) {
 // };
 
 async function getUpdatedMapView(existingView, epsg, center, extent) {
-
   let combinedExtent = extent;
   let combinedCenter = center;
-  
+
   if (existingView) {
     if (existingView.getProjection().getCode() !== `EPSG:${epsg}`) {
       alert("COGs cannot have different projections!");
       return;
     }
 
-    combinedExtent = extendExtent(existingView.calculateExtent(map.getSize()), extent);
+    combinedExtent = extendExtent(
+      existingView.calculateExtent(map.getSize()),
+      extent
+    );
     combinedCenter = getCenter(combinedExtent);
-  }
+  } else {
+    const proj4String = await getProj4String(epsg);
 
-  const proj4String = await getProj4String(epsg);
-
-  if (proj4String) {
-    proj4.defs(`EPSG:${epsg}`, proj4String);
-    register(proj4);
+    if (proj4String) {
+      proj4.defs(`EPSG:${epsg}`, proj4String);
+      register(proj4);
+    }
   }
 
   return new View({
@@ -310,16 +329,15 @@ class CycleLayers extends Control {
 
     super({
       element: element,
-      target: options.target
+      target: options.target,
     });
 
     button.addEventListener("click", this.cycleCOGLayers.bind(this), false);
   }
 
   cycleCOGLayers() {
-
-    if ( Object.keys(cogExtentMap).length < 1 ) {
-      return false
+    if (Object.keys(cogExtentMap).length < 1) {
+      return false;
     }
 
     const keys = Object.keys(cogExtentMap);
@@ -332,7 +350,7 @@ class CycleLayers extends Control {
     map
       .getLayers()
       .getArray()
-      .find(layer => layer.ol_uid == uid);
+      .find((layer) => layer.ol_uid == uid);
     map.getView().fit(extent);
     selectedLayerIndex += 1;
   }
@@ -358,9 +376,7 @@ class CycleLayers extends Control {
 //   }
 // }
 
-
 async function addUserProvidedCOG(inputUrl) {
-  // let inputUrl = document.getElementById('cogUrl').value
   if (!validUrl(inputUrl)) {
     return false;
   }
@@ -376,26 +392,39 @@ async function addUserProvidedCOG(inputUrl) {
   cogView = await getUpdatedMapView(cogView, epsg, center, extent);
   cogExtentMap[cogLayer.ol_uid] = extent;
 
+  // TODO need to reconfigure base map and reload, based on cog
   // baseMap = configBaseMap(mapFallback, cogView);
   // layers.unshift(baseMap) ? baseMap : [];
 
-  map.addLayer(cogLayer);
-  map.setView(cogView);
+  // map.addLayer(cogLayer);
+  // map.setView(cogView);
+
+  const transformedExtent = transformExtent(
+    extent,
+    `EPSG:${epsg}`,
+    "EPSG:4326"
+  );
+  const transformedCenter = transformCoord(center, `EPSG:${epsg}`, "EPSG:4326");
+  const polygonLayer = createPolygonFromExtent(
+    transformedExtent,
+    cogUrl,
+    transformedCenter
+  );
+  map.addLayer(polygonLayer);
+  map.getView().fit(transformedExtent, map.getSize());
 }
 
-
 // START
-const button = document.getElementById('cogSubmit')
-const urlBox = document.getElementById('cogUrl')
+const button = document.getElementById("cogSubmit");
+const urlBox = document.getElementById("cogUrl");
 button.addEventListener("click", () => addUserProvidedCOG(urlBox.value));
 
-const mapFallback = 'OSM';
+const mapFallback = "OSM";
 
 // let terrainLayer = null;
 let cogView = null;
 let cogExtentMap = {};
 let selectedLayerIndex = 0;
-
 
 // // TESTS
 // const cogUrl = encodeUrlFilename('https://drone-data.s3-zh.os.switch.ch/wsl/uav-datasets-for-three-alpine-glaciers/findelen_20160419/findelen_20160419_photoscan_dsm_CH1903+_LV95_0.1m_COG_deflate.tif');
@@ -413,8 +442,6 @@ let selectedLayerIndex = 0;
 // map.addLayer(cogLayer);
 // map.setView(cogView);
 
-
-
 const map = new Map({
   target: "map-container",
   layers: [
@@ -428,19 +455,33 @@ const map = new Map({
     // new ZoomLevelDisplay(),
   ]),
   view: new View({
-    projection: 'EPSG:4326',
+    projection: "EPSG:4326",
     center: [0, 0],
     zoom: 2,
   }),
   // view: cogView,
 });
 
+map.on("click", function (evt) {
+  var feature = map.forEachFeatureAtPixel(evt.pixel, function (feature) {
+    return feature;
+  });
+  if (feature) {
+    const center = feature.get("cogCenter");
+    const url = `https://www.cogeo.org/map/#/url/${encodeURIComponent(
+      feature.get("cogUrl")
+    )}/center/${center}/zoom/15.5`;
+    window.open(url, "_blank");
+  }
+});
+
 // addUserProvidedCOG('https://drone-data.s3-zh.os.switch.ch/wsl/uav-datasets-for-three-alpine-glaciers/findelen_20160419/findelen_20160419_photoscan_dsm_CH1903+_LV95_0.1m_COG_deflate.tif')
-addUserProvidedCOG('https://drone-data.s3-zh.os.switch.ch/wsl/uav-datasets-for-three-alpine-glaciers/gries_20150926/gries_20150926_photoscan_dsm_CH1903+_LV95_0.1m_COG_deflate.tif')
+// addUserProvidedCOG('https://drone-data.s3-zh.os.switch.ch/wsl/uav-datasets-for-three-alpine-glaciers/gries_20150926/gries_20150926_photoscan_dsm_CH1903+_LV95_0.1m_COG_deflate.tif')
+// addUserProvidedCOG('https://drone-data.s3-zh.os.switch.ch/wsl/uav-datasets-for-three-alpine-glaciers/stanna_20150928/stanna_20150928_photoscan_dsm_CH1903+_LV95_0.1m_COG_deflate.tif')
 
-// addUserProvidedCOG('https://drone-data.s3-zh.os.switch.ch/wsl/uav-datasets-for-three-alpine-glaciers/findelen_20160419/findelen_20160419_photoscan_oi_CH1903+_LV95_0.1m.tif')
-
-
+// addUserProvidedCOG('https://drone-data.s3-zh.os.switch.ch/wsl/uav-datasets-for-three-alpine-glaciers/findelen_20160419/findelen_20160419_photoscan_oi_CH1903+_LV95_0.1m_COG_jpeg.tif')
+// addUserProvidedCOG('https://drone-data.s3-zh.os.switch.ch/wsl/uav-datasets-for-three-alpine-glaciers/gries_20150926/gries_20150926_photoscan_oi_CH1903+_LV95_0.1m_COG_jpeg.tif')
+// addUserProvidedCOG('https://drone-data.s3-zh.os.switch.ch/wsl/uav-datasets-for-three-alpine-glaciers/stanna_20150928/stanna_20150928_photoscan_oi_CH1903+_LV95_0.1m_COG_jpeg.tif')
 
 // map.getView().on('change:resolution', () => {
 //   const zoom = Math.round(map.getView().getZoom());
