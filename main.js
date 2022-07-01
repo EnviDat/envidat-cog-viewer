@@ -1,3 +1,6 @@
+import "ol/ol.css";
+import "bootstrap/dist/css/bootstrap.min.css";
+
 import Map from "ol/Map";
 
 import View from "ol/View";

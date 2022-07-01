@@ -18,20 +18,20 @@ workflow:
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: always
 
-pip-package:
+vite-build:
   stage: build
   image: docker.io/node:16
   cache:
     key: dist
     paths:
       - dist/
-    policy: push
+    policy: pull-push
   before_script:
     - npm install
   script:
     - npm run build
 
-pages:
+rclone-sync:
   stage: deploy
   image: docker.io/rclone/rclone
   cache:
